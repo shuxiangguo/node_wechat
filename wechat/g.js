@@ -5,12 +5,15 @@ var Promise = require('bluebird');
 var request = Promise.promisify(require('request'));
 var Wechat = require('./wechat')
 var getRawBody = require('raw-body')
+var util = require('./util')
 
 
 module.exports = function(opts) {
 
-	var wechat = new Wechat(opts);
+	//var wechat = new Wechat(opts);
 	return function*(next) {
+		var that = this;
+
 		console.log(this.query);
 
 		var token = opts.token;
@@ -38,8 +41,31 @@ module.exports = function(opts) {
 				limit: '1mb',
 				encoding: this.charset
 			})
-			console.log(data.toString())
+			
+			var content = yield util.parseXMLAsync(data);
+			console.log(content);
 
+			var message = util.formatMessage(content.xml);
+			console.log(message);
+
+			if (message.MsgType === 'event') {
+				if (message.Event === 'subscribe') {
+					var now = new Date().getTime();
+
+					that.status = 200;
+					that.type = 'application/xml';
+					var reply = '<xml>' + 
+					'<ToUserName>< ![CDATA['+ message.FromUserName + '] ]></ToUserName>' + 
+					'<FromUserName>< ![CDATA[' + message.ToUserName + '] ]></FromUserName> ' +
+					'<CreateTime>' + now + '</CreateTime>' + 
+					'<MsgType>< ![CDATA[text] ]></MsgType>' +
+					'<Content>< ![CDATA[你好] ]></Content>' + 
+					'</xml>'
+					console.log(reply)
+					that.body = reply;
+					return;
+				}
+			}	
 		}
 	};
 }
